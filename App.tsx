@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, Alert, PermissionsAndroid, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
+import MapView, { Marker } from 'react-native-maps';
+import * as Location from 'expo-location';
 
 // Tipos de dados
 type Servico = {
@@ -11,31 +13,55 @@ type Servico = {
   descricao: string;
   preco: number;
   distancia: number;
+  latitude: number;
+  longitude: number;
 };
 
 type Props = { navigation: any };
 
-// Tela Home: Busca e Filtros
+// Tela Home: Busca, Filtros e Mapa
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [bairro, setBairro] = useState('');
   const [raio, setRaio] = useState('1km');
   const [tipo, setTipo] = useState<'domicilio' | 'calçada'>('domicilio');
+  const [location, setLocation] = useState<Location.LocationObject | null>(null);
+  const [errorMsg, setErrorMsg] = useState('');
 
   const servicos: Servico[] = [
-    { id: '1', nome: 'Encanador Domicílio', tipo: 'domicilio', descricao: 'Reparo em vazamentos internos', preco: 150, distancia: 500 },
-    { id: '2', nome: 'Varredor Calçada', tipo: 'calçada', descricao: 'Limpeza de rua pós-chuva', preco: 80, distancia: 200 },
-    { id: '3', nome: 'Jardineiro Calçada', tipo: 'calçada', descricao: 'Poda de árvores urbanas', preco: 120, distancia: 800 },
-    { id: '4', nome: 'Pintor de Muros', tipo: 'calçada', descricao: 'Revitalização de fachadas externas', preco: 250, distancia: 300 },
-    { id: '5', nome: 'Eletricista Domicílio', tipo: 'domicilio', descricao: 'Instalação de tomadas', preco: 200, distancia: 600 },
+    { id: '1', nome: 'Encanador Domicílio', tipo: 'domicilio', descricao: 'Reparo em vazamentos internos', preco: 150, distancia: 500, latitude: -23.5505, longitude: -46.6333 },
+    { id: '2', nome: 'Varredor Calçada', tipo: 'calçada', descricao: 'Limpeza de rua pós-chuva', preco: 80, distancia: 200, latitude: -23.5614, longitude: -46.6569 },
+    { id: '3', nome: 'Jardineiro Calçada', tipo: 'calçada', descricao: 'Poda de árvores urbanas', preco: 120, distancia: 800, latitude: -23.5505, longitude: -46.6333 },
+    { id: '4', nome: 'Pintor de Muros', tipo: 'calçada', descricao: 'Revitalização de fachadas externas', preco: 250, distancia: 300, latitude: -23.5614, longitude: -46.6569 },
+    { id: '5', nome: 'Eletricista Domicílio', tipo: 'domicilio', descricao: 'Instalação de tomadas', preco: 200, distancia: 600, latitude: -23.5505, longitude: -46.6333 },
   ];
 
+  useEffect(() => {
+    getLocation();
+  }, []);
+
+  const getLocation = async () => {
+    if (Platform.OS === 'android') {
+      const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
+      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+        setErrorMsg('Permissão de localização negada');
+        return;
+      }
+    }
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      setErrorMsg('Permissão de localização negada');
+      return;
+    }
+    const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+    setLocation(loc);
+  };
+
   const filtrarServicos = (): Servico[] => {
-    const filtered = servicos.filter(s => 
+    return servicos.filter(s => 
       s.tipo === tipo && 
       (!bairro || s.descricao.toLowerCase().includes(bairro.toLowerCase())) &&
       s.distancia <= (raio === '1km' ? 1000 : raio === '2km' ? 2000 : 5000)
     );
-    return filtered; // Sempre retorna array, mesmo vazio
   };
 
   const agendar = (servico: Servico) => {
@@ -45,11 +71,23 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     ]);
   };
 
-  const filteredServicos = filtrarServicos(); // Calcula uma vez pra evitar re-renders desnecessários
+  const filteredServicos = filtrarServicos();
 
-  // Toggle customizado pro filtro (substitui Picker)
+  // Toggle customizado
   const toggleTipo = () => {
     setTipo(tipo === 'domicilio' ? 'calçada' : 'domicilio');
+  };
+
+  const initialRegion = location ? {
+    latitude: location.coords.latitude,
+    longitude: location.coords.longitude,
+    latitudeDelta: 0.0922,
+    longitudeDelta: 0.0421,
+  } : {
+    latitude: -23.5505,
+    longitude: -46.6333,
+    latitudeDelta: 0.0922,
+    longitudeDelta: 0.0421,
   };
 
   return (
@@ -70,7 +108,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         onChangeText={setRaio}
       />
       
-      {/* Toggle Customizado para Tipo de Serviço */}
+      {/* Toggle Customizado */}
       <View style={styles.toggleContainer}>
         <TouchableOpacity 
           style={[styles.toggleButton, tipo === 'domicilio' && styles.toggleActive]}
@@ -86,12 +124,32 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Lista Filtrada */}
+      {/* Botão Localização */}
+      <TouchableOpacity style={styles.locationButton} onPress={getLocation}>
+        <Text style={styles.locationText}>Minha Localização</Text>
+      </TouchableOpacity>
+
+      {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+
+      {/* Mapa */}
+      <MapView style={styles.map} initialRegion={initialRegion}>
+        {filteredServicos.map(servico => (
+          <Marker
+            key={servico.id}
+            coordinate={{ latitude: servico.latitude, longitude: servico.longitude }}
+            title={servico.nome}
+            description={servico.descricao}
+            pinColor={servico.tipo === 'calçada' ? 'green' : 'blue'}
+          />
+        ))}
+      </MapView>
+
+      {/* Lista Filtrada (abaixo do mapa) */}
       <FlatList
-        data={filteredServicos || []} // Garante array vazio se undefined
+        data={filteredServicos || []}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => {
-          if (!item) return null; // Protege contra item undefined
+          if (!item) return null;
           return (
             <TouchableOpacity style={styles.card} onPress={() => agendar(item)}>
               <Text style={styles.cardTitle}>{item.nome}</Text>
@@ -106,7 +164,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-// Tela Agendamento
+// Tela Agendamento (igual antes)
 const AgendamentoScreen: React.FC<Props> = ({ route }) => {
   const { servico } = route.params as { servico: Servico } || {};
   return (
@@ -141,6 +199,10 @@ const styles = StyleSheet.create({
   toggleButton: { flex: 1, padding: 10, backgroundColor: '#ddd', borderRadius: 5, alignItems: 'center', marginHorizontal: 5 },
   toggleActive: { backgroundColor: '#25D366' },
   toggleText: { color: '#333', fontWeight: 'bold' },
+  locationButton: { backgroundColor: '#007AFF', padding: 10, borderRadius: 5, alignItems: 'center', marginBottom: 10 },
+  locationText: { color: 'white', fontWeight: 'bold' },
+  errorText: { color: 'red', textAlign: 'center', marginBottom: 10 },
+  map: { height: 200, marginBottom: 20 },
   card: { backgroundColor: 'white', padding: 15, marginVertical: 5, borderRadius: 8, elevation: 2 },
   cardTitle: { fontSize: 18, fontWeight: 'bold' },
   button: { backgroundColor: '#25D366', padding: 15, borderRadius: 5, alignItems: 'center', marginTop: 20 },
