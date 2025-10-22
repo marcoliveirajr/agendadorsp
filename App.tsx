@@ -40,6 +40,10 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   }, []);
 
   const getLocation = async () => {
+    if (Platform.OS === 'web') {
+      setErrorMsg('Localização não disponível no web. Teste no device!');
+      return;
+    }
     if (Platform.OS === 'android') {
       const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
@@ -131,18 +135,24 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
       {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
 
-      {/* Mapa */}
-      <MapView style={styles.map} initialRegion={initialRegion}>
-        {filteredServicos.map(servico => (
-          <Marker
-            key={servico.id}
-            coordinate={{ latitude: servico.latitude, longitude: servico.longitude }}
-            title={servico.nome}
-            description={servico.descricao}
-            pinColor={servico.tipo === 'calçada' ? 'green' : 'blue'}
-          />
-        ))}
-      </MapView>
+      {/* Mapa (só no device, placeholder no web) */}
+      {Platform.OS === 'web' ? (
+        <View style={styles.mapPlaceholder}>
+          <Text style={styles.placeholderText}>Mapa disponível no device (Expo Go). Pins mostram serviços próximos!</Text>
+        </View>
+      ) : (
+        <MapView style={styles.map} initialRegion={initialRegion}>
+          {filteredServicos.map(servico => (
+            <Marker
+              key={servico.id}
+              coordinate={{ latitude: servico.latitude, longitude: servico.longitude }}
+              title={servico.nome}
+              description={servico.descricao}
+              pinColor={servico.tipo === 'calçada' ? 'green' : 'blue'}
+            />
+          ))}
+        </MapView>
+      )}
 
       {/* Lista Filtrada (abaixo do mapa) */}
       <FlatList
@@ -164,7 +174,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-// Tela Agendamento (igual antes)
+// Tela Agendamento
 const AgendamentoScreen: React.FC<Props> = ({ route }) => {
   const { servico } = route.params as { servico: Servico } || {};
   return (
@@ -203,6 +213,8 @@ const styles = StyleSheet.create({
   locationText: { color: 'white', fontWeight: 'bold' },
   errorText: { color: 'red', textAlign: 'center', marginBottom: 10 },
   map: { height: 200, marginBottom: 20 },
+  mapPlaceholder: { height: 200, marginBottom: 20, backgroundColor: '#ddd', justifyContent: 'center', alignItems: 'center', borderRadius: 5 },
+  placeholderText: { textAlign: 'center', color: '#666', padding: 10 },
   card: { backgroundColor: 'white', padding: 15, marginVertical: 5, borderRadius: 8, elevation: 2 },
   cardTitle: { fontSize: 18, fontWeight: 'bold' },
   button: { backgroundColor: '#25D366', padding: 15, borderRadius: 5, alignItems: 'center', marginTop: 20 },
