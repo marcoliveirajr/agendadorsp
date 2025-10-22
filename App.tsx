@@ -2,8 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, Alert, PermissionsAndroid, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import MapView, { Marker } from 'react-native-maps';
-import * as Location from 'expo-location';
+
+// Condicional pro Mapa (só importa se não for web)
+let MapView: any, Marker: any, Location: any;
+if (Platform.OS !== 'web') {
+  MapView = require('react-native-maps').default;
+  Marker = require('react-native-maps').Marker;
+  Location = require('expo-location').default;
+}
 
 // Tipos de dados
 type Servico = {
@@ -24,7 +30,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [bairro, setBairro] = useState('');
   const [raio, setRaio] = useState('1km');
   const [tipo, setTipo] = useState<'domicilio' | 'calçada'>('domicilio');
-  const [location, setLocation] = useState<Location.LocationObject | null>(null);
+  const [location, setLocation] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState('');
 
   const servicos: Servico[] = [
@@ -36,14 +42,14 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   ];
 
   useEffect(() => {
-    getLocation();
+    if (Platform.OS !== 'web') {
+      getLocation();
+    } else {
+      setErrorMsg('Mapa e localização disponíveis só no device. Use Expo Go!');
+    }
   }, []);
 
   const getLocation = async () => {
-    if (Platform.OS === 'web') {
-      setErrorMsg('Localização não disponível no web. Teste no device!');
-      return;
-    }
     if (Platform.OS === 'android') {
       const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
@@ -135,7 +141,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
       {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
 
-      {/* Mapa (só no device, placeholder no web) */}
+      {/* Mapa (só no device) */}
       {Platform.OS === 'web' ? (
         <View style={styles.mapPlaceholder}>
           <Text style={styles.placeholderText}>Mapa disponível no device (Expo Go). Pins mostram serviços próximos!</Text>
@@ -154,7 +160,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         </MapView>
       )}
 
-      {/* Lista Filtrada (abaixo do mapa) */}
+      {/* Lista Filtrada */}
       <FlatList
         data={filteredServicos || []}
         keyExtractor={(item) => item.id}
