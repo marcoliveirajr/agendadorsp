@@ -8,7 +8,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "entryPoint": "./index.ts",
+    "entryPoint": "./App.tsx",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
